@@ -287,7 +287,7 @@ pub use error::{Error, Result};
 pub use help::{HelpContext, HelpEntry, HelpViewer};
 pub use parameter::Parameter;
 #[doc(inline)]
-pub use repl::Repl;
+pub use repl::{Repl, Prompt};
 
 use std::collections::BTreeMap;
 

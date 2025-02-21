@@ -6,7 +6,6 @@ use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::boxed::Box;
 use std::collections::BTreeMap;
 use std::fmt::Display;
-use yansi::Paint;
 
 type ErrorHandler<Context, E> = fn(error: E, repl: &Repl<Context, E>) -> Result<()>;
 
@@ -18,13 +17,15 @@ fn default_error_handler<Context, E: std::fmt::Display>(
 	Ok(())
 }
 
+pub trait Prompt {
+	fn prompt(&self) -> String;
+}
+
 /// Main REPL struct
 pub struct Repl<Context, E: std::fmt::Display> {
 	name: String,
 	version: String,
 	description: String,
-	prompt: Box<dyn Display>,
-	custom_prompt: bool,
 	commands: BTreeMap<String, Command<Context, E>>,
 	aliases: BTreeMap<String, String>,
 	context: Context,
@@ -37,6 +38,7 @@ pub struct Repl<Context, E: std::fmt::Display> {
 impl<Context, E> Repl<Context, E>
 where
 	E: Display + From<Error>,
+	Context: Prompt,
 {
 	/// Create a new Repl with the given context's initial value.
 	pub fn new(context: Context) -> Self {
@@ -46,8 +48,6 @@ where
 			name: name.clone(),
 			version: String::new(),
 			description: String::new(),
-			prompt: Box::new(Paint::green(format!("{}> ", name)).bold()),
-			custom_prompt: false,
 			commands: BTreeMap::new(),
 			aliases: BTreeMap::new(),
 			context,
@@ -61,10 +61,6 @@ where
 	/// Give your Repl a name. This is used in the help summary for the Repl.
 	pub fn with_name(mut self, name: &str) -> Self {
 		self.name = name.to_string();
-		if !self.custom_prompt {
-			self.prompt = Box::new(Paint::green(format!("{}> ", name)).bold());
-		}
-
 		self
 	}
 
@@ -78,15 +74,6 @@ where
 	/// Give your Repl a description. This is used in the help summary for the Repl.
 	pub fn with_description(mut self, description: &str) -> Self {
 		self.description = description.to_string();
-
-		self
-	}
-
-	/// Give your Repl a custom prompt. The default prompt is the Repl name, followed by
-	/// a `>`, all in green, followed by a space.
-	pub fn with_prompt(mut self, prompt: &'static dyn Display) -> Self {
-		self.prompt = Box::new(prompt);
-		self.custom_prompt = true;
 
 		self
 	}
@@ -266,7 +253,7 @@ where
 		editor: &mut rustyline::Editor<Helper>,
 		eof: &mut bool,
 	) -> Result<()> {
-		match editor.readline(&format!("{}", self.prompt)) {
+		match editor.readline(&format!("{}", self.context.prompt())) {
 			Ok(line) => {
 				editor.add_history_entry(line.clone());
 				if let Err(error) = self.process_line(line) {
