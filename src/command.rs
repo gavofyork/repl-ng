@@ -1,11 +1,13 @@
 use crate::error::*;
 use crate::Callback;
 use crate::Parameter;
+use std::collections::BTreeMap;
 use std::fmt;
 
 /// Struct to define a command in the REPL
 pub struct Command<Context, E> {
     pub(crate) name: String,
+    pub(crate) aliases: Vec<String>,
     pub(crate) parameters: Vec<Parameter>,
     pub(crate) callback: Callback<Context, E>,
     pub(crate) help_summary: Option<String>,
@@ -31,11 +33,12 @@ impl<Context, E> std::cmp::PartialEq for Command<Context, E> {
 
 impl<Context, E> Command<Context, E> {
     /// Create a new command with the given name and callback function
-    pub fn new(name: &str, callback: Callback<Context, E>) -> Self {
+    pub fn new(name: impl ToString, callback: impl Fn(BTreeMap<String, String>, &mut Context) -> std::result::Result<Option<String>, E> + 'static) -> Self {
         Self {
             name: name.to_string(),
+            aliases: vec![],
             parameters: vec![],
-            callback,
+            callback: Box::new(callback),
             help_summary: None,
         }
     }
@@ -53,8 +56,15 @@ impl<Context, E> Command<Context, E> {
     }
 
     /// Add a help summary for the command
-    pub fn with_help(mut self, help: &str) -> Command<Context, E> {
+    pub fn with_help(mut self, help: impl ToString) -> Command<Context, E> {
         self.help_summary = Some(help.to_string());
+
+        self
+    }
+
+    /// Add an alias for the command
+    pub fn with_alias(mut self, help: impl ToString) -> Command<Context, E> {
+        self.aliases.push(help.to_string());
 
         self
     }

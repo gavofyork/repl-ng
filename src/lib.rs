@@ -4,12 +4,12 @@
 //! # Example
 //!
 //! ```
-//! use std::collections::HashMap;
+//! use std::collections::BTreeMap;
 //! use repl_rs::{Command, Parameter, Result, Value};
 //! use repl_rs::{Convert, Repl};
 //!
 //! // Write "Hello"
-//! fn hello<T>(args: HashMap<String, Value>, _context: &mut T) -> Result<Option<String>> {
+//! fn hello<T>(args: BTreeMap<String, Value>, _context: &mut T) -> Result<Option<String>> {
 //!     Ok(Some(format!("Hello, {}", args["who"])))
 //! }
 //!
@@ -34,7 +34,7 @@
 //! - the `hello` command has a single parameter, "who", which is required, and has the given help
 //! message
 //!
-//! The `hello` function takes a HashMap of named arguments, contained in a
+//! The `hello` function takes a BTreeMap of named arguments, contained in a
 //! [Value](struct.Value.html) struct, and an (unused) `Context`, which is used to hold state if you
 //! need to - the initial context is passed in to the call to
 //! [Repl::new](struct.Repl.html#method.new), in our case, `()`.
@@ -54,10 +54,10 @@
 //! ```
 //! use repl_rs::{Command, Parameter, Result, Value};
 //! use repl_rs::{Convert, Repl};
-//! use std::collections::HashMap;
+//! use std::collections::BTreeMap;
 //!
 //! // Add two numbers.
-//! fn add<T>(args: HashMap<String, Value>, _context: &mut T) -> Result<Option<String>> {
+//! fn add<T>(args: BTreeMap<String, Value>, _context: &mut T) -> Result<Option<String>> {
 //!     let first: i32 = args["first"].convert()?;
 //!     let second: i32 = args["second"].convert()?;
 //!
@@ -86,7 +86,7 @@
 //! ```
 //! use repl_rs::{Command, Parameter, Result, Value};
 //! use repl_rs::{Convert, Repl};
-//! use std::collections::{HashMap, VecDeque};
+//! use std::collections::{BTreeMap, VecDeque};
 //!
 //! #[derive(Default)]
 //! struct Context {
@@ -94,7 +94,7 @@
 //! }
 //!
 //! // Append name to list
-//! fn append(args: HashMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
+//! fn append(args: BTreeMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
 //!     let name: String = args["name"].convert()?;
 //!     context.list.push_back(name);
 //!     let list: Vec<String> = context.list.clone().into();
@@ -103,7 +103,7 @@
 //! }
 //!
 //! // Prepend name to list
-//! fn prepend(args: HashMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
+//! fn prepend(args: BTreeMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
 //!     let name: String = args["name"].convert()?;
 //!     context.list.push_front(name);
 //!     let list: Vec<String> = context.list.clone().into();
@@ -140,7 +140,7 @@
 //!
 //! use repl_rs::{initialize_repl, Convert, Repl};
 //! use repl_rs::{Command, Parameter, Result, Value};
-//! use std::collections::{HashMap, VecDeque};
+//! use std::collections::{BTreeMap, VecDeque};
 //!
 //! /// Example using initialize_repl
 //!
@@ -150,7 +150,7 @@
 //! }
 //!
 //! // Append name to list
-//! fn append(args: HashMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
+//! fn append(args: BTreeMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
 //!     let name: String = args["name"].convert()?;
 //!     context.list.push_back(name);
 //!     let list: Vec<String> = context.list.clone().into();
@@ -159,7 +159,7 @@
 //! }
 //!
 //! // Prepend name to list
-//! fn prepend(args: HashMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
+//! fn prepend(args: BTreeMap<String, Value>, context: &mut Context) -> Result<Option<String>> {
 //!     let name: String = args["name"].convert()?;
 //!     context.list.push_front(name);
 //!     let list: Vec<String> = context.list.clone().into();
@@ -218,7 +218,7 @@
 //! ```
 //! use repl_rs::{Command, Parameter, Value};
 //! use repl_rs::{Convert, Repl};
-//! use std::collections::HashMap;
+//! use std::collections::BTreeMap;
 //! use std::fmt;
 //! use std::result::Result;
 //!
@@ -247,7 +247,7 @@
 //! }
 //!
 //! // Divide two numbers.
-//! fn divide<T>(args: HashMap<String, Value>, _context: &mut T) -> Result<Option<String>, Error> {
+//! fn divide<T>(args: BTreeMap<String, Value>, _context: &mut T) -> Result<Option<String>, Error> {
 //!     let numerator: f32 = args["numerator"].convert()?;
 //!     let denominator: f32 = args["denominator"].convert()?;
 //!
@@ -274,11 +274,11 @@
 //! ```
 //!
 mod command;
+#[allow(hidden_glob_reexports)]
 mod error;
 mod help;
 mod parameter;
 mod repl;
-mod value;
 
 pub use clap::*;
 pub use command::Command;
@@ -288,14 +288,12 @@ pub use help::{HelpContext, HelpEntry, HelpViewer};
 pub use parameter::Parameter;
 #[doc(inline)]
 pub use repl::Repl;
-#[doc(inline)]
-pub use value::{Convert, Value};
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Command callback function signature
 pub type Callback<Context, Error> =
-    fn(HashMap<String, Value>, &mut Context) -> std::result::Result<Option<String>, Error>;
+    Box<dyn Fn(BTreeMap<String, String>, &mut Context) -> std::result::Result<Option<String>, Error>>;
 
 /// Initialize the name, version and description of the Repl from your crate name, version and
 /// description

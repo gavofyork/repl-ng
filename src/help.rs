@@ -9,6 +9,9 @@ pub struct HelpEntry {
     /// Command from `help <command>`
     pub command: String,
 
+    /// The aliases, if any.
+    pub aliases: Vec<String>,
+
     /// Parameters defined for the command
     pub parameters: Vec<(String, bool)>,
 
@@ -19,11 +22,13 @@ pub struct HelpEntry {
 impl HelpEntry {
     pub(crate) fn new(
         command_name: &str,
+        aliases: &Vec<String>,
         parameters: &[Parameter],
         summary: &Option<String>,
     ) -> Self {
         Self {
             command: command_name.to_string(),
+            aliases: aliases.clone(),
             parameters: parameters
                 .iter()
                 .map(|pd| (pd.name.clone(), pd.required))
@@ -88,6 +93,9 @@ impl HelpViewer for DefaultHelpViewer {
         self.print_help_header(context);
         for entry in &context.help_entries {
             print!("{}", entry.command);
+            if !entry.aliases.is_empty() {
+                print!(", {}", entry.aliases.join(", "));
+            }
             if entry.summary.is_some() {
                 print!(" - {}", entry.summary.as_ref().unwrap());
             }
@@ -102,6 +110,9 @@ impl HelpViewer for DefaultHelpViewer {
             println!("{}: {}", entry.command, entry.summary.as_ref().unwrap());
         } else {
             println!("{}:", entry.command);
+        }
+        if !entry.aliases.is_empty() {
+            println!("Aliases: {}", entry.aliases.join(", "));
         }
         println!("Usage:");
         print!("\t{}", entry.command);
