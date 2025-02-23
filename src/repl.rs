@@ -19,6 +19,7 @@ fn default_error_handler<Context, E: std::fmt::Display>(
 
 pub trait Prompt {
 	fn prompt(&self) -> String;
+	fn complete(&self, args: &[&str], incomplete: &str) -> String;
 }
 
 /// Main REPL struct
@@ -28,7 +29,7 @@ pub struct Repl<Context, E: std::fmt::Display> {
 	description: String,
 	commands: BTreeMap<String, Command<Context, E>>,
 	aliases: BTreeMap<String, String>,
-	context: Context,
+	context: Option<Context>,
 	help_context: Option<HelpContext>,
 	help_viewer: Box<dyn HelpViewer>,
 	error_handler: ErrorHandler<Context, E>,
@@ -50,7 +51,7 @@ where
 			description: String::new(),
 			commands: BTreeMap::new(),
 			aliases: BTreeMap::new(),
-			context,
+			context: Some(context),
 			help_context: None,
 			help_viewer: Box::new(DefaultHelpViewer::new()),
 			error_handler: default_error_handler,
@@ -143,7 +144,7 @@ where
 		match self.commands.get(&canon) {
 			Some(definition) => {
 				let validated = self.validate_arguments(command, &definition.parameters, args)?;
-				match (definition.callback)(validated, &mut self.context) {
+				match (definition.callback)(validated, self.context.as_mut().unwrap()) {
 					Ok(Some(value)) => println!("{}", value),
 					Ok(None) => (),
 					Err(error) => return Err(error),
@@ -223,22 +224,15 @@ where
 		));
 	}
 
-	fn create_helper(&mut self) -> Helper {
-		let mut helper = Helper::new();
-		if self.use_completion {
-			for name in self.commands.keys() {
-				helper.add_command(name.to_string());
-			}
-		}
-
-		helper
-	}
-
 	pub fn run(&mut self) -> Result<()> {
 		self.construct_help_context();
-		let mut editor: rustyline::Editor<Helper> = rustyline::Editor::new();
-		let helper = Some(self.create_helper());
-		editor.set_helper(helper);
+		let mut editor: rustyline::Editor<Helper<Context>> = rustyline::Editor::new();
+		editor.set_helper(Some(Helper {
+			commands: self.commands.keys().cloned().collect(),
+			context: None,
+		}));
+		// TODO: Read history from a file if history configured.
+		// editor.add_history_entry(line.clone());
 		println!("Welcome to {} {}", self.name, self.version);
 		let mut eof = false;
 		while !eof {
@@ -248,14 +242,26 @@ where
 		Ok(())
 	}
 
+//    /// Load the history from the specified file.
+//    pub fn load_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()>;
+//    /// Save the history in the specified file.
+//    pub fn save_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()>;
+//    /// Append new entries in the specified file.
+//    pub fn append_history<P: AsRef<Path> + ?Sized>(&mut self, path: &P) -> Result<()>;
+
 	fn handle_line(
 		&mut self,
-		editor: &mut rustyline::Editor<Helper>,
+		editor: &mut rustyline::Editor<Helper<Context>>,
 		eof: &mut bool,
 	) -> Result<()> {
-		match editor.readline(&format!("{}", self.context.prompt())) {
+		let prompt = format!("{}", self.context.as_ref().unwrap().prompt());
+		editor.helper_mut().unwrap().context = self.context.take();
+		let r = editor.readline(&prompt);
+		self.context = editor.helper_mut().unwrap().context.take();
+		match r {
 			Ok(line) => {
 				editor.add_history_entry(line.clone());
+				// TODO: Add to a file if history configured.
 				if let Err(error) = self.process_line(line) {
 					(self.error_handler)(error, self)?;
 				}
@@ -279,21 +285,12 @@ where
 // Currently just does command completion with <tab>, if
 // use_completion() is set on the REPL
 #[derive(Clone, Helper, Hinter, Highlighter, Validator)]
-struct Helper {
+struct Helper<Context: Prompt> {
 	commands: Vec<String>,
+	context: Option<Context>,
 }
 
-impl Helper {
-	fn new() -> Self {
-		Self { commands: vec![] }
-	}
-
-	fn add_command(&mut self, command: String) {
-		self.commands.push(command);
-	}
-}
-
-impl completion::Completer for Helper {
+impl<Context: Prompt> completion::Completer for Helper<Context> {
 	type Candidate = String;
 
 	fn complete(
