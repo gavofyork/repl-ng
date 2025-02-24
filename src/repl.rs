@@ -19,7 +19,7 @@ fn default_error_handler<Context, E: std::fmt::Display>(
 
 pub trait Prompt {
 	fn prompt(&self) -> String;
-	fn complete(&self, args: &[&str], incomplete: &str) -> String;
+	fn complete(&self, command: &str, args: &[&str], incomplete: &str) -> Vec<String>;
 }
 
 /// Main REPL struct
@@ -184,20 +184,10 @@ where
 		Ok(())
 	}
 
-	fn process_line(&mut self, line: String) -> core::result::Result<(), E> {
-		let trimmed = line.trim();
-		if !trimmed.is_empty() {
-			let r = regex::Regex::new(r#"("[^"\n]+"|[\S]+)"#).unwrap();
-			let args = r
-				.captures_iter(trimmed)
-				.map(|a| a[0].to_string().replace('\"', ""))
-				.collect::<Vec<String>>();
-			let mut args = args.iter().fold(vec![], |mut state, a| {
-				state.push(a.as_str());
-				state
-			});
-			let command: String = args.drain(..1).collect();
-			self.handle_command(&command, &args)?;
+	fn process_line(&mut self, line: &str) -> core::result::Result<(), E> {
+		let (command, args) = split_line(line.trim());
+		if !command.is_empty() {
+			self.handle_command(&command, &args.iter().map(|s| s.as_ref()).collect::<Vec<_>>())?;
 		}
 		Ok(())
 	}
@@ -262,7 +252,7 @@ where
 			Ok(line) => {
 				editor.add_history_entry(line.clone());
 				// TODO: Add to a file if history configured.
-				if let Err(error) = self.process_line(line) {
+				if let Err(error) = self.process_line(&line) {
 					(self.error_handler)(error, self)?;
 				}
 				*eof = false;
@@ -278,6 +268,32 @@ where
 				Ok(())
 			}
 		}
+	}
+}
+
+fn split_line(line: &str) -> (String, Vec<String>) {
+	let trimmed = line.trim();
+	if trimmed.is_empty() {
+		Default::default()
+	} else {
+		let r = regex::Regex::new(r#"("[^"\n]+"|[\S]+)"#).unwrap();
+		let mut args = r
+			.captures_iter(trimmed)
+			.map(|a| a[0].to_string().replace('\"', ""))
+			.collect::<Vec<String>>();
+		let command = args.remove(0);
+		if line.ends_with(' ') {
+			args.push(Default::default());
+		}
+		(command, args)
+	}
+}
+
+fn quote_if_needed(s: String) -> String {
+	if s.contains(' ') {
+		format!("\"{s}\"")
+	} else {
+		s
 	}
 }
 
@@ -301,13 +317,26 @@ impl<Context: Prompt> completion::Completer for Helper<Context> {
 	) -> rustyline::Result<(usize, Vec<Self::Candidate>)> {
 		// Complete based on whether the current line is a substring
 		// of one of the set commands
-		let ret: Vec<Self::Candidate> = self
-			.commands
-			.iter()
-			.filter(|cmd| cmd.contains(line))
-			.map(|s| s.to_string())
-			.collect();
-		Ok((0, ret))
+		let (command, mut args) = split_line(line);
+//		println!("split: >{line}< {command} {args:?}");
+		if let Some(last_arg) = args.pop() {
+			let Some(context) = self.context.as_ref() else { return Ok((0, Vec::new())) };
+			let first_args = args.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+			let last_cands = context.complete(&command, &first_args, &last_arg);
+//			println!("complete: {} {:?} >{}< {:?}", command, first_args, last_arg, last_cands);
+			let args_blob = args.iter().cloned().map(quote_if_needed).collect::<Vec<_>>().join(" ");
+			let prefix = format!("{command}{}{args_blob}", if args_blob.is_empty() { "" } else { " " });
+			let completions = last_cands.into_iter().map(|c| format!("{prefix} {c}")).collect();
+			Ok((0, completions))
+		} else {
+			let ret: Vec<Self::Candidate> = self
+				.commands
+				.iter()
+				.filter(|cmd| cmd.contains(&command))
+				.map(|s| s.to_string())
+				.collect();
+			Ok((0, ret))
+		}
 	}
 }
 
