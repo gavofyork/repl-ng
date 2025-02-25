@@ -218,7 +218,11 @@ where
 		self.construct_help_context();
 		let mut editor: rustyline::Editor<Helper<Context>> = rustyline::Editor::new();
 		editor.set_helper(Some(Helper {
-			commands: self.commands.keys().cloned().collect(),
+			canon: self.commands.keys()
+				.map(|x| (x, x))
+				.chain(self.aliases.iter())
+				.map(|(x, y)| (x.clone(), y.clone()))
+				.collect(),
 			context: None,
 		}));
 		// TODO: Read history from a file if history configured.
@@ -302,7 +306,7 @@ fn quote_if_needed(s: String) -> String {
 // use_completion() is set on the REPL
 #[derive(Clone, Helper, Hinter, Highlighter, Validator)]
 struct Helper<Context: Prompt> {
-	commands: Vec<String>,
+	canon: BTreeMap<String, String>,
 	context: Option<Context>,
 }
 
@@ -322,6 +326,7 @@ impl<Context: Prompt> completion::Completer for Helper<Context> {
 		if let Some(last_arg) = args.pop() {
 			let Some(context) = self.context.as_ref() else { return Ok((0, Vec::new())) };
 			let first_args = args.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+			let command = self.canon.get(&command).cloned().unwrap_or(command);
 			let last_cands = context.complete(&command, &first_args, &last_arg);
 //			println!("complete: {} {:?} >{}< {:?}", command, first_args, last_arg, last_cands);
 			let args_blob = args.iter().cloned().map(quote_if_needed).collect::<Vec<_>>().join(" ");
@@ -330,8 +335,8 @@ impl<Context: Prompt> completion::Completer for Helper<Context> {
 			Ok((0, completions))
 		} else {
 			let ret: Vec<Self::Candidate> = self
-				.commands
-				.iter()
+				.canon
+				.keys()
 				.filter(|cmd| cmd.contains(&command))
 				.map(|s| s.to_string())
 				.collect();
