@@ -22,6 +22,11 @@ pub trait Prompt {
 	fn complete(&self, command: &str, args: &[&str], incomplete: &str) -> Vec<String>;
 }
 
+impl Prompt for () {
+	fn prompt(&self) -> String { "> ".into() }
+	fn complete(&self, command: &str, args: &[&str], incomplete: &str) -> Vec<String> { vec![] }
+}
+
 /// Main REPL struct
 pub struct Repl<Context, E: std::fmt::Display> {
 	name: String,
@@ -358,6 +363,7 @@ mod tests {
 	use std::fs::File;
 	use std::io::Write;
 	use std::os::unix::io::FromRawFd;
+	use super::Prompt;
 
 	fn test_error_handler<Context>(error: Error, _repl: &Repl<Context, Error>) -> Result<()> {
 		Err(error)
@@ -367,7 +373,7 @@ mod tests {
 		Ok(Some(format!("foo {:?}", args)))
 	}
 
-	fn run_repl<Context>(mut repl: Repl<Context, Error>, input: &str, expected: Result<()>) {
+	fn run_repl<Context: Prompt>(mut repl: Repl<Context, Error>, input: &str, expected: Result<()>) {
 		let (rdr, wrtr) = pipe().unwrap();
 		unsafe {
 			match fork() {
@@ -395,7 +401,7 @@ mod tests {
 
 					dup2(rdr, 0).unwrap();
 					close(rdr).unwrap();
-					let mut editor: rustyline::Editor<Helper> = rustyline::Editor::new();
+					let mut editor: rustyline::Editor<Helper<Context>> = rustyline::Editor::new();
 					let mut eof = false;
 					let result = repl.handle_line(&mut editor, &mut eof);
 					let _ = std::panic::take_hook();
