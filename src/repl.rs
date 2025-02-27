@@ -6,6 +6,7 @@ use rustyline_derive::{Helper, Highlighter, Hinter, Validator};
 use std::boxed::Box;
 use std::collections::BTreeMap;
 use std::fmt::Display;
+use std::path::{Path, PathBuf};
 
 type ErrorHandler<Context, E> = fn(error: E, repl: &Repl<Context, E>) -> Result<()>;
 
@@ -24,7 +25,7 @@ pub trait Prompt {
 
 impl Prompt for () {
 	fn prompt(&self) -> String { "> ".into() }
-	fn complete(&self, command: &str, args: &[&str], incomplete: &str) -> Vec<String> { vec![] }
+	fn complete(&self, _command: &str, _args: &[&str], _incomplete: &str) -> Vec<String> { vec![] }
 }
 
 /// Main REPL struct
@@ -39,6 +40,7 @@ pub struct Repl<Context, E: std::fmt::Display> {
 	help_viewer: Box<dyn HelpViewer>,
 	error_handler: ErrorHandler<Context, E>,
 	use_completion: bool,
+	history: Option<PathBuf>,
 }
 
 impl<Context, E> Repl<Context, E>
@@ -61,6 +63,7 @@ where
 			help_viewer: Box::new(DefaultHelpViewer::new()),
 			error_handler: default_error_handler,
 			use_completion: false,
+			history: None,
 		}
 	}
 
@@ -104,6 +107,16 @@ where
 		self.use_completion = value;
 
 		self
+	}
+
+	pub fn with_history_in(mut self, p: &std::path::Path) -> Self {
+		self.history = Some(p.to_path_buf());
+
+		self
+	}
+
+	pub fn with_history(self) -> Self {
+		self.with_history_in(Path::new(".polkajam-repl-history"))
 	}
 
 	/// Add a command to your REPL
@@ -230,8 +243,9 @@ where
 				.collect(),
 			context: None,
 		}));
-		// TODO: Read history from a file if history configured.
-		// editor.add_history_entry(line.clone());
+		if let Some(history) = self.history.as_ref() {
+			let _ = editor.load_history(history);
+		}
 		println!("Welcome to {} {}", self.name, self.version);
 		let mut eof = false;
 		while !eof {
@@ -260,7 +274,9 @@ where
 		match r {
 			Ok(line) => {
 				editor.add_history_entry(line.clone());
-				// TODO: Add to a file if history configured.
+				if let Some(history) = self.history.as_ref() {
+					let _ = editor.append_history(history);
+				}
 				if let Err(error) = self.process_line(&line) {
 					(self.error_handler)(error, self)?;
 				}
