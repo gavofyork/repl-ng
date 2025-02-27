@@ -2,7 +2,7 @@
 
 Library to help you create a [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) for your application.
 
-Forked from repl-rs, add deeper support for custom completion, dynamic prompts and command aliases. Also removes the `Value` abstraction (which massively complicated things when your code must do its own string-interpretation anyway) in favor using plain `String`s.
+Forked from [repl-rs](https://github.com/jacklund/repl-rs), added deeper support for custom completion, dynamic prompts and command aliases. Also removes the `Value` abstraction in favor using plain `String`s.
 
 Basic example code:
 
