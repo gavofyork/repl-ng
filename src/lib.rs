@@ -1,4 +1,4 @@
-//! repl-rs - [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) library
+//! repl-ng - [REPL](https://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop) library
 //! for Rust
 //!
 //! # Example
@@ -26,7 +26,7 @@
 //!     repl.run()
 //!  }
 //! ```
-//! repl-rs uses the [builder](https://en.wikipedia.org/wiki/Builder_pattern) pattern extensively.
+//! repl-ng uses the [builder](https://en.wikipedia.org/wiki/Builder_pattern) pattern extensively.
 //! What these lines are doing is:
 //! - creating a repl with an empty Context (see below)
 //! - with a name of "MyApp", the given version, and the given description
@@ -187,7 +187,7 @@
 //! getting messages like `error: cannot find macro 'crate_name' in this scope`.
 //!
 //! # Help
-//! repl-rs has support for supplying help commands for your REPL. This is accomplished through the
+//! repl-ng has support for supplying help commands for your REPL. This is accomplished through the
 //! [HelpViewer](trait.HelpViewer.html), which is a trait that has a default implementation which should give you pretty
 //! much what you expect.
 //! ```bash
