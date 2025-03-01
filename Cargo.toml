@@ -1,6 +1,6 @@
 [package]
 name = "repl-ng"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Jack Lund <jackl@geekheads.net>", "Gav Wood <gavin@parity.io>"]
 description = "Library to generate a REPL for your application"
 license = "MIT"
